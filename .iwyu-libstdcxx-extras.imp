@@ -1,0 +1,3 @@
+[
+  { "include": [ "<bits/unicode-data.h>", "private", "<format>", "public" ] },
+]

@@ -1,49 +1,90 @@
 # CUDA Auto-Compat
-CUDA Auto-Comapt is a shim library around the CUDA driver runtime libraries to
-automatically detect and load the appropriate set of driver runtime libraries
-for the current runtime environment.
+
+**CUDA Auto-Compat** is a dynamic loader shim that automatically detects and
+loads the most appropriate version of the CUDA driver runtime libraries
+(`libcuda.so.1`, etc.) based on the runtime environment.
+
+It eliminates the need for fragile `LD_LIBRARY_PATH` hacks by dynamically
+resolving the best available driver stack at load time.
 
 ## CUDA Forward Compatibility
-The runtime components for the CUDA toolkit depend on both a runtime library
-provided by the toolkit, `libcudart.so.1`, and a runtime library provided by the
-driver, `libcuda.so.1`.  Since newer versions of the CUDA toolkit may depend on
-APIs or features in newer driver versions that what may be installed the toolkit
-provides a forward compatibility package called `cuda-compat` containing a set of
-driver runtime libraries that can be used by applications built with a newer
-toolkit version to run against an older driver version.  To use the forward
-compatibility libraries they just need to be found by the dynamic runtime linker,
-`ld.so`, before the runtime libraries provided by the installed driver.  Typically
-this can be done by adding the forward compatibility install location (e.g.
-`/usr/local/cuda-12.4/compat`) to `LD_LIBRARY_PATH` so they get found before the
-driver provided libraries in system search path (e.g. `/usr/lib64` on RHEL /
-Fedora or `/usr/lib/x86_64-linux-gnu` on Debian / Ubuntu).
 
-See [Forward Compatibility](https://docs.nvidia.com/deploy/cuda-compatibility/index.html#forward-compatibility)
-for more details regarding forward compatibility.
+The CUDA runtime consists of two key shared libraries:
 
+-   `libcudart.so.1`: provided by the **CUDA toolkit**
+-   `libcuda.so.1`: provided by the **GPU driver**
+
+Since newer versions of the CUDA toolkit may depend on features found only in
+newer drivers, NVIDIA provides a **forward compatibility mechanism** via the
+`cuda-compat` package. This package includes a set of driver runtime libraries
+that allow newer toolkits to run on older installed drivers.
+
+To use forward compatibility, these libraries must be found **before** the
+system's driver-provided versions during dynamic linking - typically by
+prepending their directory (e.g. `/usr/local/cuda-12.4/compat`) to
+`LD_LIBRARY_PATH`.
+
+See the official NVIDIA docs on
+[CUDA Forward Compatibility](https://docs.nvidia.com/deploy/cuda-compatibility/index.html#forward-compatibility)
+for more details.
 
 ## What's wrong with just using `LD_LIBRARY_PATH`?
-Which set of driver runtime libraries to use, driver provided or toolkit provided
-forward compatibility, depends on the specific combination of driver toolkit
-versions.  This means that any change in either of the two versions may require
-a change in which set of libraries to use.  For example, upgrading the driver on
-a system may no longer need the forward compatibility libraries from the installed
-toolkit and keeping them in `LD_LIBRARY_PATH` will break applications when CUDA
-is initialized.  Similarly, if a newer toolkit is installed without an accompanying
-driver upgrade then not using it's forward compatibility libraries can result in
-a similar breakage.
 
+Whether you need to use the system-provided driver libraries or the toolkit's
+forward-compatibility libraries depends on the _specific_ combination of
+installed driver and toolkit versions.
+
+This means:
+
+-   Upgrading your driver may make the forward-compat libraries
+    **unnecessary** - but leaving them in `LD_LIBRARY_PATH` can **break**
+    applications.
+-   Installing a newer toolkit _without_ a driver upgrade may **require**
+    forward-compat libraries - and omitting them can break applications in a
+    different way.
+
+Maintaining `LD_LIBRARY_PATH` by hand becomes brittle, error-prone, and
+incompatible with flexible environments.
 
 ## How does CUDA Auto-Compat solve this?
-The CUDA Auto-Compat library provides a small shim `libcuda.so.1` library that
-searches the runtime loader for all `libcuda.so.1` driver runtime libraries, not
-just the first one found, and queries their supported CUDA API version.  The set of
-libraries providing the newest API version is then dynamically loaded with
-`dlopen`.  All of this happens when the shim is initially loaded by the runtime
-linker via a function with the `constructor` attribute before any symbols are
-resolved so when the runtime linker later tries to resolve symbols from
-`libcuda.so.1` they are resolved by the loaded implementation instead of the shim.
 
-This allows for both the driver and toolkit versions to change while still ensuring
-the appropriate set of driver runtime libraries are used, so long as the
-Auto-Compat provided `libcuda.so.1` is found first.
+CUDA Auto-Compat dynamically scans the system for _all available_ driver runtime
+libraries, determines which provide the newest supported CUDA API version, and
+configures the dynamic linker to use those.
+
+This guarantees that:
+
+-   The best compatible driver stack is always used
+-   You can safely change driver or toolkit versions without needing to update
+    environment variables
+-   Applications don’t need to know or care - it "just works"
+
+## Implementation Details
+
+CUDA Auto-Compat is designed to be **transparent to applications** - no source
+changes or rebuilds are required.
+
+It provides two runtime interfaces that integrate with the dynamic linker:
+
+-   :detective: **RTLD-AUDIT**: Audit Library (`libcuda_autocompat_audit.so.0`)
+    Intercepts library loading via the `LD_AUDIT` mechanism and redirects
+    specific CUDA driver libraries at runtime.
+
+    Use via:
+
+         `LD_AUDIT=/path/to/autocompat/lib64/libcuda_autocompat_audit.so.0`
+
+-   :jigsaw: **GNU IFUNC**: IFUNC Shim Library (`libcuda.so.1`) A stub library
+    using GNU `ifunc` resolvers to select the appropriate real driver libraries
+    at symbol resolution time.
+
+    Use via:
+
+        `LD_LIBRARY_PATH=/path/to/autocompat/lib64:$LD_LIBRARY_PATH`
+
+-   :mag: **HELPER EXECUTABLE**: Search Helper
+    (`libexec/cuda_autocompat_search`) A statically linked C++ executable that
+    performs all filesystem traversal and version selection logic. It is invoked
+    automatically by both the RTLD-AUDIT and IFUNC libraries.
+
+    NOTE: This is _not intended to be invoked directly_ by user applications.

@@ -1,0 +1,46 @@
+---
+WarningsAsErrors: ''
+HeaderFileExtensions:
+  - ''
+  - h
+  - hh
+  - hpp
+  - hxx
+ImplementationFileExtensions:
+  - c
+  - cc
+  - cpp
+  - cxx
+HeaderFilterRegex: ''
+ExcludeHeaderFilterRegex: ''
+FormatStyle:     none
+SystemHeaders:   false
+Checks:
+  - bugprone-*
+  - -bugprone-easily-swappable-parameters
+  - cert-*
+  - clang-analyzer-*
+  - -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+  - clang-diagnostic-*
+  - -clang-diagnostic-unknown-argument
+  - cppcoreguidelines-*
+  - -cppcoreguidelines-macro-usage
+  - -cppcoreguidelines-avoid-non-const-global-variables
+  - -cppcoreguidelines-pro-bounds-pointer-arithmetic
+  - -cppcoreguidelines-pro-type-union-access
+  - google-*
+  - -google-build-using-namespace
+  - hicpp-*
+  - llvm-include-cleaner
+  - misc-*
+  - -misc-include-cleaner
+  - -misc-no-recursion
+  - -misc-use-internal-linkage
+  - performance-*
+  - readability-*
+  - -readability-avoid-nested-conditional-operator
+  - -readability-non-const-parameter
+CheckOptions:
+  readability-function-cognitive-complexity.IgnoreMacros: true
+...
+

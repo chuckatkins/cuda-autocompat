@@ -1,0 +1,4 @@
+[
+  { "ref": ".iwyu-libstdcxx-extras.imp" },
+  { "ref": ".iwyu-spdlog.imp" }
+]
