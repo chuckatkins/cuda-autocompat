@@ -1,0 +1,15 @@
+name: "Changed Files"
+description: "Determine the number of changed file matching defined filters"
+author: "Chuck Atkins <chuckatkins@gmail.com>"
+inputs:
+  filters:
+    description: "YAML string defining named groups of glob patterns"
+    required: true
+outputs:
+  all:
+    description: "Total number of changed files, including unmatched"
+  ci:
+    description: "CI-related files that have changed"
+runs:
+  using: "node20"
+  main: "main.js"

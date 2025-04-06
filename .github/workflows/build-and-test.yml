@@ -13,7 +13,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      all: ${{ steps.changes.outputs.all }}
+      ci: ${{ steps.changes.outputs.ci }}
+      src: ${{ steps.changes.outputs.src }}
+      docs: ${{ steps.changes.outputs.docs }}
+      linters: ${{ steps.changes.outputs.linters }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect changed files
+        id: changes
+        uses: ./.github/actions/changed-files
+        with:
+          filters: |
+            src:
+              - 'CMakeLists.txt'
+              - 'cmake/**'
+              - 'src/**'
+              - 'tests/**'
+            docs:
+              - '**.md'
+              - 'docs/**'
+              - 'README*'
+              - 'LICENSE*'
+            linters:
+              - '.clang-tidy'
+              - '.cppcheck'
+              - '.iwyu*'
+
   build-and-test:
+    needs: detect_changes
+    if: needs.detect_changes.outputs.src
     runs-on: ubuntu-latest
     env:
       CMAKE_GENERATOR: Ninja
@@ -56,6 +90,8 @@ jobs:
           ctest --test-dir build --output-on-failure
 
   linters:
+    needs: detect_changes
+    if: needs.detect_changes.outputs.src || needs.detect_changes.outputs.linters
     runs-on: ubuntu-latest
     env:
       CMAKE_GENERATOR: Ninja
@@ -87,7 +123,23 @@ jobs:
 
       - name: Configure with linters enabled
         run: |
-          cmake -S source -B build -DAUTOCOMPAT_ENABLE_LINTERS=ON
+          linter_args=()
+          if [ "${{ matrix.linter }}" == "cppcheck" ]; then
+            linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
+            linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
+          elif [ "${{ matrix.linter }}" == "clang-tidy" ]; then
+            linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
+            linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
+          elif [ "${{ matrix.linter }}" == "include-what-you-use" ]; then
+            linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
+            linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
+          fi
+
+          cmake \
+            -S source \
+            -B build \
+            -DAUTOCOMPAT_ENABLE_LINTERS=ON \
+            "${linter_args[@]}"
 
       - name: Build
         run: |
