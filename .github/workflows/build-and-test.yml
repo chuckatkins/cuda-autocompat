@@ -13,43 +13,14 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  detect-changes:
-    name: Detect Changed Files
-    runs-on: ubuntu-latest
-    outputs:
-      all: ${{ steps.changes.outputs.all }}
-      ci: ${{ steps.changes.outputs.ci }}
-      src: ${{ steps.changes.outputs.src }}
-      docs: ${{ steps.changes.outputs.docs }}
-      linters: ${{ steps.changes.outputs.linters }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Detect changed files
-        id: changes
-        uses: ./.github/actions/changed-files
-        with:
-          filters: |
-            src:
-              - 'CMakeLists.txt'
-              - 'cmake/**'
-              - 'src/**'
-              - 'tests/**'
-            docs:
-              - '**.md'
-              - 'docs/**'
-              - 'README*'
-              - 'LICENSE*'
-            linters:
-              - '.clang-tidy'
-              - '.cppcheck'
-              - '.iwyu*'
+  changed-files:
+    name: Changed Files
+    uses: ./.github/workflows/changed-files.yml
 
   build-and-test:
-    name: Build (${{ matrix.libcxx && format('{0}, {1}', matrix.compiler, matrix.libcxx) || matrix.compiler }})
-    needs: detect-changes
-    if: needs.detect-changes.outputs.src == 'true'
+    needs: changed-files
+    if: needs.changed-files.outputs.src_test
+    name: Build
     runs-on: ubuntu-latest
     env:
       CMAKE_GENERATOR: Ninja
@@ -92,9 +63,9 @@ jobs:
           ctest --test-dir build --output-on-failure
 
   linters:
-    name: Linter (${{ matrix.tool }})
-    needs: detect-changes
-    if: needs.detect-changes.outputs.src == 'true' || needs.detect-changes.outputs.linters == 'true'
+    name: Linter
+    needs: changed-files
+    if: needs.changed-files.outputs.src || needs.changed-files.outputs.linters
     runs-on: ubuntu-latest
     env:
       CMAKE_GENERATOR: Ninja
@@ -141,6 +112,7 @@ jobs:
           cmake \
             -S source \
             -B build \
+            -DBUILD_TESTING=OFF \
             -DAUTOCOMPAT_ENABLE_LINTERS=ON \
             "${linter_args[@]}"
 

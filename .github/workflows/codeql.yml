@@ -13,28 +13,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  detect-changes:
-    name: Detect Changed Files
-    runs-on: ubuntu-latest
-    outputs:
-      src: ${{ steps.changes.outputs.src }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Detect changed files
-        id: changes
-        uses: ./.github/actions/changed-files
-        with:
-          filters: |
-            src:
-              - 'CMakeLists.txt'
-              - 'cmake/**'
-              - 'src/**'
+  changed-files:
+    name: Changed Files
+    uses: ./.github/workflows/changed-files.yml
 
   analyze:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.src == 'true'
+    needs: changed-files
+    if: needs.changed-files.outputs.src
     name: Analyze
     runs-on: ubuntu-latest
     permissions:
