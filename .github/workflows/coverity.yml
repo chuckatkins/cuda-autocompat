@@ -1,0 +1,133 @@
+name: Coverity
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }} ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  detect_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      src: ${{ steps.changes.outputs.src }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect changed files
+        id: changes
+        uses: ./.github/actions/changed-files
+        with:
+          filters: |
+            src:
+              - 'CMakeLists.txt'
+              - 'cmake/**'
+              - 'src/**'
+              - 'tests/**'
+
+  coverity:
+    needs: detect_changes
+    if: needs.detect_changes.outputs.src == 'true'
+    name: Coverity Static Analysis
+    runs-on: ubuntu-latest
+    env:
+      CMAKE_GENERATOR: Ninja
+      CC: clang
+      CXX: clang++
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build
+
+      - name: Download Coverity tools
+        env:
+          COVERITY_TOKEN: ${{ secrets.COVERITY_TOKEN }}
+          COVERITY_PROJECT: ${{ secrets.COVERITY_PROJECT }}
+        run: |
+          mkdir -p ~/coverity
+          curl -fsSL --retry 3 \
+            -o ~/coverity/cov-analysis.tgz \
+            --data "token=${COVERITY_TOKEN}" \
+            --data "project=${COVERITY_PROJECT}" \
+            "https://scan.coverity.com/download/linux64"
+
+          tar -C ~/coverity -xzf ~/coverity/cov-analysis.tgz
+
+          cov_dir="$(find ~/coverity -maxdepth 1 -type d -name 'cov-analysis*')"
+          export PATH="${cov_dir}/bin:${PATH}"
+
+          echo "Coverity tools available at: ${cov_dir}"
+          which cov-build
+
+          echo "PATH=${PATH}" >> "${GITHUB_ENV}"
+
+      - name: Configure
+        run: |
+          cmake -S source -B build -DBUILD_TESTING=OFF
+
+      - name: Build
+        run: |
+          cd build
+
+          echo "::group:: Building"
+          cov-build --dir cov-int cmake --build .
+          echo "::endgroup::"
+
+          echo "::group:: Package Coverity results"
+          tar -czvf ../coverity-results.tgz cov-int
+          echo "::endgroup::"
+
+      - name: Save coverity-results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverity-results
+          path: coverity-results.tgz
+
+      - name: Upload to Coverity
+        env:
+          COVERITY_TOKEN: ${{ secrets.COVERITY_TOKEN }}
+          COVERITY_PROJECT: ${{ secrets.COVERITY_PROJECT }}
+          COVERITY_EMAIL: ${{ secrets.COVERITY_EMAIL }}
+        run: |
+          echo "::group:: Setting form fields"
+          pushd source
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            git fetch origin "${GITHUB_HEAD_REF}"
+            SHORT_SHA=$(git rev-parse --short "origin/${GITHUB_HEAD_REF}")
+            PR_NUMBER=${GITHUB_REF_NAME%%/*}
+            form_version="github-pr${PR_NUMBER}-${GITHUB_HEAD_REF}-${SHORT_SHA}"
+            form_description="GitHub Pull Request Analysis"
+          else
+            git fetch origin "${GITHUB_REF}"
+            SHORT_SHA=$(git rev-parse --short "origin/${GITHUB_REF}")
+            form_version="github-${GITHUB_REF_NAME}-${SHORT_SHA}"
+            form_description="GitHub Push Analysis"
+          fi
+          popd
+          echo ${form_version}
+          echo "::endgroup::"
+
+          echo "::group:: Uploading with curl"
+          curl --retry 3 \
+            --form token="${COVERITY_TOKEN}" \
+            --form project="${COVERITY_PROJECT}" \
+            --form email="${COVERITY_EMAIL}" \
+            --form file=@coverity-results.tgz \
+            --form version="${form_version}" \
+            --form description="${form_description}" \
+            https://scan.coverity.com/builds
+          echo "::endgroup::"
