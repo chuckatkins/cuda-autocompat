@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changed-files:
+    name: Changed Files
+    uses: ./.github/workflows/changed-files.yml
+
+  build-and-test:
+    needs: changed-files
+    if: needs.changed-files.outputs.src_test
+    name: Build
+    runs-on: ubuntu-latest
+    env:
+      CMAKE_GENERATOR: Ninja
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc
+          - compiler: clang
+            libcxx: libstdc++
+          - compiler: clang
+            libcxx: libc++
+    steps:
+      - name: Checkout code into source directory
+        uses: actions/checkout@v2
+        with:
+          path: source
+
+      - name: Install dependencies
+        run: sudo apt-get install -y build-essential cmake ninja-build
+
+      - name: Install libc++ if needed
+        if: matrix.libcxx == 'libc++'
+        run: sudo apt-get install -y libc++-dev libc++abi-dev
+
+      - name: Configure
+        env:
+          CC: ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
+          CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
+          CXXFLAGS: ${{ matrix.libcxx && format('-stdlib={0}', matrix.libcxx) }}
+        run: cmake -S source -B build
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  linters:
+    needs: changed-files
+    if: needs.changed-files.outputs.src || needs.changed-files.outputs.linters
+    name: Linter
+    uses: ./.github/workflows/linters.yml
+
+  codeql:
+    needs: changed-files
+    if: needs.changed-files.outputs.src
+    name: CodeQL
+    uses: ./.github/workflows/codeql.yml
+    permissions:
+      security-events: write
