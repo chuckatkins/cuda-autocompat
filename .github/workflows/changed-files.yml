@@ -1,0 +1,62 @@
+name: Detect Changed Files
+
+on:
+  workflow_call:
+    outputs:
+      src:
+        description: "Source files changed"
+        value: ${{ jobs.detect.outputs.src }}
+      test:
+        description: "Test files changed"
+        value: ${{ jobs.detect.outputs.test }}
+      src_test:
+        description: "Source or test files changed"
+        value: ${{ jobs.detect.outputs.src_test }}
+      docs:
+        description: "Docs files changed"
+        value: ${{ jobs.detect.outputs.docs }}
+      linters:
+        description: "Linter config files changed"
+        value: ${{ jobs.detect.outputs.linters }}
+
+jobs:
+  detect:
+    name: Detect
+    runs-on: ubuntu-latest
+    outputs:
+      all: ${{ steps.changes.outputs.all }}
+      ci: ${{ fromJSON(steps.changes.outputs.ci) > 0 }}
+      src: ${{ fromJSON(steps.changes.outputs.ci) > 0 || steps.changes.outputs.src > 0 }}
+      test: ${{ fromJSON(steps.changes.outputs.ci) > 0 || steps.changes.outputs.test > 0 }}
+      src_test: ${{ fromJSON(steps.changes.outputs.ci) > 0 || steps.changes.outputs.src_test > 0 }}
+      docs: ${{ fromJSON(steps.changes.outputs.ci) > 0 || steps.changes.outputs.docs > 0 }}
+      linters: ${{ fromJSON(steps.changes.outputs.ci) > 0 || steps.changes.outputs.linters > 0 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect changed files
+        id: changes
+        uses: ./.github/actions/changed-files
+        with:
+          filters: |
+            src:
+              - 'CMakeLists.txt'
+              - 'cmake/**'
+              - 'src/**'
+            test:
+              - 'tests/**'
+            src_test:
+              - 'CMakeLists.txt'
+              - 'cmake/**'
+              - 'src/**'
+              - 'tests/**'
+            docs:
+              - '**.md'
+              - 'docs/**'
+              - 'README*'
+              - 'LICENSE*'
+            linters:
+              - '.clang-tidy'
+              - '.cppcheck'
+              - '.iwyu*'

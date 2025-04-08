@@ -14,12 +14,9 @@ function gitShaExistsLocally(sha) {
 }
 
 try {
-    console.log(`GITHUB_EVENT_PATH="${process.env.GITHUB_EVENT_PATH}"`);
     const eventPath = process.env.GITHUB_EVENT_PATH;
-    console.log(`GITHUB_EVENT_NAME="${process.env.GITHUB_EVENT_NAME}"`);
     const eventName = process.env.GITHUB_EVENT_NAME;
     const eventData = JSON.parse(fs.readFileSync(eventPath, "utf8"));
-    console.log(`GITHUB_STEP_SUMMARY="${process.env.GITHUB_STEP_SUMMARY}"`);
     const summaryPath = process.env.GITHUB_STEP_SUMMARY;
 
     let base, head;
@@ -88,10 +85,9 @@ try {
         ciPatterns.some((pattern) => minimatch(file, pattern))
     );
 
-    core.setOutput("ci", ciMatchedFiles.length > 0 ? "true" : "false");
+    core.setOutput("ci", ciMatchedFiles.length.toString());
 
     if (ciMatchedFiles.length > 0) {
-        console.log(`Changes detected - ci.should_run = true`);
         console.log(`${ciMatchedFiles.length} file(s) matched`);
         for (const f of changedFiles) {
             console.log(f);
@@ -116,16 +112,10 @@ try {
             patterns.some((pattern) => minimatch(file, pattern))
         );
 
-        const count = matchedFiles.length;
-        const shouldRun = ciMatchedFiles.length > 0 || count > 0;
+        core.setOutput(group, matchedFiles.length.toString());
 
-        core.setOutput(group, shouldRun ? "true" : "false");
-
-        if (shouldRun && ciMatchedFiles.length > 0) {
-            console.log("should_run = true triggered by CI changes");
-        }
-        if (count > 0) {
-            console.log(`${count} file(s) matched`);
+        if (matchedFiles.length > 0) {
+            console.log(`${matchedFiles.length} file(s) matched`);
             for (const f of matchedFiles) {
                 console.log(f);
             }
@@ -135,9 +125,8 @@ try {
 
         if (summaryPath) {
             fs.appendFileSync(summaryPath, `### Group ${group}\n`);
-            fs.appendFileSync(summaryPath, `- Matched files: ${count}\n`);
-            fs.appendFileSync(summaryPath, `- should_run: ${shouldRun}\n`);
-            if (count > 0) {
+            fs.appendFileSync(summaryPath, `- Matched files: ${matchedFiles.length}\n`);
+            if (matchedFiles.length > 0) {
                 fs.appendFileSync(
                     summaryPath,
                     matchedFiles.map((f) => `  - ${f}\n`).join("")

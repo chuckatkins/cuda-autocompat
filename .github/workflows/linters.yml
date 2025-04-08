@@ -1,0 +1,58 @@
+name: Linters
+
+on:
+  workflow_call:
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    env:
+      CMAKE_GENERATOR: Ninja
+      CC: clang
+      CXX: clang++
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: [cppcheck, clang-tidy, include-what-you-use]
+
+    steps:
+      - name: Checkout code into source directory
+        uses: actions/checkout@v2
+        with:
+          path: source
+
+      - name: Install dependencies
+        run: |
+          if [ "${{ matrix.tool }}" == "cppcheck" ]; then
+            linter_pkg=cppcheck
+          elif [ "${{ matrix.tool }}" == "clang-tidy" ]; then
+            linter_pkg=clang-tidy
+          elif [ "${{ matrix.tool }}" == "include-what-you-use" ]; then
+            linter_pkg=iwyu
+          fi
+          sudo apt-get install -y \
+              build-essential cmake clang ninja-build ${linter_pkg}
+
+      - name: Configure
+        run: |
+          linter_args=()
+          if [ "${{ matrix.linter }}" == "cppcheck" ]; then
+            linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
+            linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
+          elif [ "${{ matrix.linter }}" == "clang-tidy" ]; then
+            linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
+            linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
+          elif [ "${{ matrix.linter }}" == "include-what-you-use" ]; then
+            linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
+            linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
+          fi
+          cmake \
+            -S source \
+            -B build \
+            -DBUILD_TESTING=OFF \
+            -DAUTOCOMPAT_ENABLE_LINTERS=ON \
+            "${linter_args[@]}"
+
+      - name: Build
+        run: cmake --build build
