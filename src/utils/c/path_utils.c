@@ -87,7 +87,7 @@ inline int path_join(char dst[PATH_MAX], const char *parent, int parent_len,
         parent_len = 1;
     }
 
-    bool parent_has_sep = parent_len > 0 && parent[parent_len - 1] == '/';
+    bool parent_has_sep = parent[parent_len - 1] == '/';
     bool child_has_sep = child_len > 0 && child[0] == '/';
 
     int extra_sep = (parent_has_sep || child_has_sep) ? 0 : 1;
