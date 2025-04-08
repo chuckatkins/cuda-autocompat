@@ -13,7 +13,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  detect_changes:
+  detect-changes:
+    name: Detect Changed Files
     runs-on: ubuntu-latest
     outputs:
       all: ${{ steps.changes.outputs.all }}
@@ -46,8 +47,9 @@ jobs:
               - '.iwyu*'
 
   build-and-test:
-    needs: detect_changes
-    if: needs.detect_changes.outputs.src
+    name: Build (${{ matrix.libcxx && format('{0}, {1}', matrix.compiler, matrix.libcxx) || matrix.compiler }})
+    needs: detect-changes
+    if: needs.detect-changes.outputs.src == 'true'
     runs-on: ubuntu-latest
     env:
       CMAKE_GENERATOR: Ninja
@@ -77,7 +79,7 @@ jobs:
         env:
           CC: ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
           CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
-          CXXFLAGS: ${{ matrix.compiler == 'clang' && '-stdlib=' || '' }}${{ matrix.libcxx }}
+          CXXFLAGS: ${{ matrix.libcxx && format('-stdlib={0}', matrix.libcxx) }}
         run: |
           cmake -S source -B build
 
@@ -90,8 +92,9 @@ jobs:
           ctest --test-dir build --output-on-failure
 
   linters:
-    needs: detect_changes
-    if: needs.detect_changes.outputs.src || needs.detect_changes.outputs.linters
+    name: Linter (${{ matrix.tool }})
+    needs: detect-changes
+    if: needs.detect-changes.outputs.src == 'true' || needs.detect-changes.outputs.linters == 'true'
     runs-on: ubuntu-latest
     env:
       CMAKE_GENERATOR: Ninja
@@ -100,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        linter: [cppcheck, clang-tidy, include-what-you-use]
+        tool: [cppcheck, clang-tidy, include-what-you-use]
 
     steps:
       - name: Checkout code into source directory
@@ -109,17 +112,17 @@ jobs:
           path: source
 
       - name: Install dependencies
-        run: sudo apt-get install -y build-essential cmake clang ninja-build
-
-      - name: Install linters
         run: |
-          if [ "${{ matrix.linter }}" == "cppcheck" ]; then
-            sudo apt-get install -y cppcheck
-          elif [ "${{ matrix.linter }}" == "clang-tidy" ]; then
-            sudo apt-get install -y clang-tidy
-          elif [ "${{ matrix.linter }}" == "include-what-you-use" ]; then
-            sudo apt-get install -y iwyu
+          if [ "${{ matrix.tool }}" == "cppcheck" ]; then
+            linter_pkg=cppcheck
+          elif [ "${{ matrix.tool }}" == "clang-tidy" ]; then
+            linter_pkg=clang-tidy
+          elif [ "${{ matrix.tool }}" == "include-what-you-use" ]; then
+            linter_pkg=iwyu
           fi
+
+          sudo apt-get install -y \
+              build-essential cmake clang ninja-build ${linter_pkg}
 
       - name: Configure with linters enabled
         run: |
