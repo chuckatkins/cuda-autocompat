@@ -1,17 +1,20 @@
-name: CodeQL Advanced
+name: Static Analyzers
 
 on:
   workflow_call:
 
 jobs:
-  analyze:
-    name: Analyze
+  codeql:
+    name: CodeQL
     runs-on: ubuntu-latest
+    env:
+      CC: clang
+      CXX: clang++
 
     steps:
       - name: Install dependencies
         run: |
-          sudo apt-get install -y build-essential cmake ninja-build
+          sudo apt-get install -y build-essential cmake
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,11 +31,11 @@ jobs:
           cmake \
             -S ${GITHUB_WORKSPACE} \
             -B ${GITHUB_WORKSPACE}/build \
-            -G Ninja \
             -DBUILD_TESTING=OFF
-          cmake \
-            --build ${GITHUB_WORKSPACE}/build \
-            --verbose
+
+          # We don't need to actually do a build since CodeQL just needs the
+          # compiler invocations dumped to stdout
+           jq -r '.[].command' ${GITHUB_WORKSPACE}/build/compile_commands.json
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

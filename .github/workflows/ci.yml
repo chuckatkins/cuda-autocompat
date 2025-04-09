@@ -65,10 +65,10 @@ jobs:
     name: Linter
     uses: ./.github/workflows/linters.yml
 
-  codeql:
+  static-analyzers:
     needs: changed-files
     if: needs.changed-files.outputs.src
-    name: CodeQL
-    uses: ./.github/workflows/codeql.yml
+    name: Static Analyzers
+    uses: ./.github/workflows/static-analyzers.yml
     permissions:
       security-events: write
