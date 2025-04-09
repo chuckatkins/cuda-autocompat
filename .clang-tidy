@@ -11,8 +11,6 @@ ImplementationFileExtensions:
   - cc
   - cpp
   - cxx
-HeaderFilterRegex: ''
-ExcludeHeaderFilterRegex: ''
 FormatStyle:     none
 SystemHeaders:   false
 Checks:

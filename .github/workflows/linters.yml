@@ -14,11 +14,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        tool: [cppcheck, clang-tidy, include-what-you-use]
+        tool: [cppcheck, include-what-you-use]
 
     steps:
-      - name: Checkout code into source directory
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           path: source
 
@@ -26,8 +26,6 @@ jobs:
         run: |
           if [ "${{ matrix.tool }}" == "cppcheck" ]; then
             linter_pkg=cppcheck
-          elif [ "${{ matrix.tool }}" == "clang-tidy" ]; then
-            linter_pkg=clang-tidy
           elif [ "${{ matrix.tool }}" == "include-what-you-use" ]; then
             linter_pkg=iwyu
           fi
@@ -39,9 +37,6 @@ jobs:
           linter_args=()
           if [ "${{ matrix.linter }}" == "cppcheck" ]; then
             linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
-            linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
-          elif [ "${{ matrix.linter }}" == "clang-tidy" ]; then
-            linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
             linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
           elif [ "${{ matrix.linter }}" == "include-what-you-use" ]; then
             linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
@@ -56,3 +51,39 @@ jobs:
 
       - name: Build
         run: cmake --build build
+
+  clang-tidy:
+    name: Clang Tidy
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+      CXX: clang++
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          sudo apt-get install -y \
+            build-essential cmake clang clang-tidy
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install clang-tidy-sarif
+        run: cargo install clang-tidy-sarif sarif-fmt
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Configure
+        run: cmake -S source -B build -DBUILD_TESTING=OFF
+
+      - name: Analyze
+        run: source/scripts/ci/clang-tidy-sarif.sh source build
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          checkout_path: source
+          sarif_file: clang-tidy.sarif
