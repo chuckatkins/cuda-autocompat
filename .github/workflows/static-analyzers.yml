@@ -1,0 +1,96 @@
+name: Static Analyzers
+
+on:
+  workflow_call:
+
+jobs:
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+      CXX: clang++
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y build-essential cmake
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Initializes the CodeQL tools for scanning.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: c-cpp
+          build-mode: manual
+          queries: security-extended,security-and-quality
+
+      - run: |
+          cmake \
+            -S ${GITHUB_WORKSPACE} \
+            -B ${GITHUB_WORKSPACE}/build \
+            -DBUILD_TESTING=OFF
+
+          # We don't need to actually do a build since CodeQL just needs the
+          # compiler invocations dumped to stdout
+           jq -r '.[].command' ${GITHUB_WORKSPACE}/build/compile_commands.json
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:c-cpp"
+
+  clang-analyzer:
+    name: Clang Analyzer
+    runs-on: ubuntu-latest
+    env:
+      CMAKE_GENERATOR: Ninja
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y build-essential cmake clang-tools ninja-build
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Configure
+        run: |
+          sb_prefix=$(dirname $(dirname $(realpath $(which scan-build))))
+          echo "Using scan-build installed in ${sb_prefix}"
+
+          export CC=${sb_prefix}/libexec/ccc-analyzer
+          export CXX=${sb_prefix}/libexec/c++-analyzer
+
+          CCC_CC=$(which clang) CCC_CXX=$(which clang++) \
+          cmake \
+            -S source \
+            -B build \
+            -DBUILD_TESTING=OFF
+
+      - name: Analyze
+        run: |
+          mkdir sarif
+          CCC_CC=/bin/true CCC_CXX=/bin/true \
+          scan-build \
+            -V -sarif -o sarif \
+            cmake --build build
+
+      - name: Merge SARIF results
+        run: |
+          jq -s '.[0] * {
+              runs: (map(.runs) | add | map(
+                .tool.driver.name = "Clang Static Analyzer"
+              ))
+            }' \
+            sarif/*/*.sarif | tee merged.sarif
+
+      - name: Upload SARIF report
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          checkout_path: source
+          sarif_file: merged.sarif
