@@ -11,28 +11,20 @@ jobs:
       CMAKE_GENERATOR: Ninja
       CC: clang
       CXX: clang++
+      EXTRA_PACKAGES: ${{ matrix.linter }}
     strategy:
       fail-fast: false
       matrix:
-        tool: [cppcheck, clang-tidy, include-what-you-use]
+        linter: [cppcheck, clang-tidy, iwyu]
 
     steps:
       - name: Checkout code into source directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: source
 
       - name: Install dependencies
-        run: |
-          if [ "${{ matrix.tool }}" == "cppcheck" ]; then
-            linter_pkg=cppcheck
-          elif [ "${{ matrix.tool }}" == "clang-tidy" ]; then
-            linter_pkg=clang-tidy
-          elif [ "${{ matrix.tool }}" == "include-what-you-use" ]; then
-            linter_pkg=iwyu
-          fi
-          sudo apt-get install -y \
-              build-essential cmake clang ninja-build ${linter_pkg}
+        run: sudo -E source/scripts/ci/gha/install-dependencies.sh
 
       - name: Configure
         run: |
@@ -43,7 +35,7 @@ jobs:
           elif [ "${{ matrix.linter }}" == "clang-tidy" ]; then
             linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
             linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
-          elif [ "${{ matrix.linter }}" == "include-what-you-use" ]; then
+          elif [ "${{ matrix.linter }}" == "iwyu" ]; then
             linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
             linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
           fi

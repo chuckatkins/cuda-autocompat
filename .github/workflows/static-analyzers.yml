@@ -8,16 +8,16 @@ jobs:
     name: CodeQL
     runs-on: ubuntu-latest
     env:
+      CMAKE_GENERATOR: Ninja
       CC: clang
       CXX: clang++
 
     steps:
-      - name: Install dependencies
-        run: |
-          sudo apt-get install -y build-essential cmake
-
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo -E scripts/ci/gha/install-dependencies.sh
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
@@ -35,7 +35,7 @@ jobs:
 
           # We don't need to actually do a build since CodeQL just needs the
           # compiler invocations dumped to stdout
-           jq -r '.[].command' ${GITHUB_WORKSPACE}/build/compile_commands.json
+          ninja -C build -n
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
@@ -47,26 +47,28 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CMAKE_GENERATOR: Ninja
+      CC: clang
+      CXX: clang++
+      EXTRA_PACKAGES: clang-tools
 
     steps:
-      - name: Install dependencies
-        run: |
-          sudo apt-get install -y build-essential cmake clang-tools ninja-build
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           path: source
+
+      - name: Install dependencies
+        run: sudo -E source/scripts/ci/gha/install-dependencies.sh
 
       - name: Configure
         run: |
           sb_prefix=$(dirname $(dirname $(realpath $(which scan-build))))
           echo "Using scan-build installed in ${sb_prefix}"
 
+          export CCC_CC=${CC} CCC_CXX=${CXX}
           export CC=${sb_prefix}/libexec/ccc-analyzer
           export CXX=${sb_prefix}/libexec/c++-analyzer
 
-          CCC_CC=$(which clang) CCC_CXX=$(which clang++) \
           cmake \
             -S source \
             -B build \
@@ -74,8 +76,10 @@ jobs:
 
       - name: Analyze
         run: |
+          # Make compilation a no-op since we only want to run the analysis
+          export CCC_CC=/bin/true CCC_CXX=/bin/true
+
           mkdir sarif
-          CCC_CC=/bin/true CCC_CXX=/bin/true \
           scan-build \
             -V -sarif -o sarif \
             cmake --build build
