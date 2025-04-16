@@ -1,3 +1,4 @@
+# FORCED CHANGE COMMENT
 name: CI
 
 on:
@@ -24,6 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CMAKE_GENERATOR: Ninja
+      CC: ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
+      CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
+      CXXFLAGS: ${{ matrix.libcxx && format('-stdlib={0}', matrix.libcxx) }}
     strategy:
       fail-fast: false
       matrix:
@@ -33,24 +37,17 @@ jobs:
             libcxx: libstdc++
           - compiler: clang
             libcxx: libc++
+
     steps:
       - name: Checkout code into source directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: source
 
       - name: Install dependencies
-        run: sudo apt-get install -y build-essential cmake ninja-build
-
-      - name: Install libc++ if needed
-        if: matrix.libcxx == 'libc++'
-        run: sudo apt-get install -y libc++-dev libc++abi-dev
+        run: sudo -E source/scripts/ci/gha/install-dependencies.sh
 
       - name: Configure
-        env:
-          CC: ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
-          CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
-          CXXFLAGS: ${{ matrix.libcxx && format('-stdlib={0}', matrix.libcxx) }}
         run: cmake -S source -B build
 
       - name: Build

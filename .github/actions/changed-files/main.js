@@ -6,7 +6,7 @@ const fs = require("fs");
 
 function gitShaExistsLocally(sha) {
   try {
-    execSync(`git cat-file -e ${sha}^{commit}`, { stdio: 'ignore' });
+    execSync(`git rev-list -n 1 ${sha}`, { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -37,13 +37,13 @@ try {
         console.log(`Skipping fetch base=${base} (already exists)`);
     } else {
         console.log(`Fetching base=${base}`);
-        execSync(`git fetch origin ${base} --depth=1`);
+        execSync(`git fetch origin ${base}`);
     }
     if (gitShaExistsLocally(head)) {
         console.log(`Skipping fetch head=${head} (already exists)`);
     } else {
         console.log(`Fetching head=${head}`);
-        execSync(`git fetch origin ${head} --depth=1`);
+        execSync(`git fetch origin ${head}`);
     }
 
     console.log("Computing diff");
