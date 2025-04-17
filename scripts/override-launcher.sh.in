@@ -1,0 +1,9 @@
+#!/bin/sh
+
+cmd="$1"
+shift
+if [ -n "${@OVERRIDE_VARIABLE@}" ]
+then
+    cmd="${@OVERRIDE_VARIABLE@}"
+fi
+exec "${cmd}" "$@"

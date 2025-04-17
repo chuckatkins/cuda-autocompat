@@ -14,12 +14,19 @@
 
 cmake_minimum_required(VERSION 3.25)
 
+# LAUNCHER configuration needs to be done before project() so it's used
+# when detecting compilers and generating the build files
+list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(AutoCompatBuildUtils)
+option(AUTOCOMPAT_ENABLE_OVERRIDE_LAUNCHER
+    "Configure and use the compiler override launcher"
+    FALSE
+)
+configure_override_launcher()
+
 project(CUDAAutoCompat LANGUAGES C CXX VERSION 0.1.0)
 
-list(PREPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-
 include(GNUInstallDirs)
-include(AutoCompatBuildUtils)
 
 init_build_type()
 
@@ -48,6 +55,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # C++ standard library
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 
+include(CTest)
+option(AUTOCOMPAT_ENABLE_TESTING
+    "Build the testing tree"
+    ${BUILD_TESTING}
+)
+
 add_extra_flags()
 add_static_cxx_flags()
 add_security_flags()
@@ -73,7 +86,6 @@ add_linter_options()
 
 add_subdirectory(src)
 
-include(CTest)
-if (BUILD_TESTING)
+if (AUTOCOMPAT_ENABLE_TESTING)
     add_subdirectory(tests)
 endif()

@@ -15,32 +15,43 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          path: source
 
       - name: Install dependencies
-        run: sudo -E scripts/ci/gha/install-dependencies.sh
+        run: sudo -E source/scripts/ci/gha/install-dependencies.sh
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
+          source-root: source
           languages: c-cpp
           build-mode: manual
           queries: security-extended,security-and-quality
 
-      - run: |
+      - name: Configure
+        run: |
           cmake \
-            -S ${GITHUB_WORKSPACE} \
-            -B ${GITHUB_WORKSPACE}/build \
-            -DBUILD_TESTING=OFF
+              -S source \
+              -B build \
+              -DAUTOCOMPAT_ENABLE_OVERRIDE_COMPILER_LAUNCHER=ON \
+              -DAUTOCOMPAT_ENABLE_TESTING=OFF
 
-          # We don't need to actually do a build since CodeQL just needs the
-          # compiler invocations dumped to stdout
-          ninja -C build -n
+      - name: Build
+        env:
+          LAUNCHER_OVERRIDE_CC: codeql-clang
+          REAL_CC: /bin/true
+          LAUNCHER_OVERRIDE_CXX: codeql-clang++
+          REAL_CXX: /bin/true
+        run: cmake --build build
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
+          checkout_path: ${{ github.workspace }}/source
           category: "/language:c-cpp"
+          upload-database: true
 
   clang-analyzer:
     name: Clang Analyzer
@@ -61,24 +72,21 @@ jobs:
         run: sudo -E source/scripts/ci/gha/install-dependencies.sh
 
       - name: Configure
+        env:
+          LAUNCHER_OVERRIDE_CC: ${{ env.CC }}
+          LAUNCHER_OVERRIDE_CXX: ${{ env.CXX }}
         run: |
-          sb_prefix=$(dirname $(dirname $(realpath $(which scan-build))))
-          echo "Using scan-build installed in ${sb_prefix}"
-
-          export CCC_CC=${CC} CCC_CXX=${CXX}
-          export CC=${sb_prefix}/libexec/ccc-analyzer
-          export CXX=${sb_prefix}/libexec/c++-analyzer
-
-          cmake \
+          scan-build cmake \
             -S source \
             -B build \
+            -DAUTOCOMPAT_ENABLE_OVERRIDE_COMPILER_LAUNCHER=ON \
             -DBUILD_TESTING=OFF
 
       - name: Analyze
+        env:
+          CCC_CC: /bin/true
+          CCC_CXX: /bin/true
         run: |
-          # Make compilation a no-op since we only want to run the analysis
-          export CCC_CC=/bin/true CCC_CXX=/bin/true
-
           mkdir sarif
           scan-build \
             -V -sarif -o sarif \
