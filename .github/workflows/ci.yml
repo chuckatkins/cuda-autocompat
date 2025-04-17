@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.head_ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   changed-files:
     name: Changed Files
@@ -20,31 +24,37 @@ jobs:
   build-and-test:
     needs: changed-files
     if: needs.changed-files.outputs.src_test
+
     name: Build
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/chuckatkins/cuda-autocompat:ci-ubuntu-latest
+
     env:
       CMAKE_GENERATOR: Ninja
-      CC: ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang' }}
-      CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
-      CXXFLAGS: ${{ matrix.libcxx && format('-stdlib={0}', matrix.libcxx) }}
+      CI_COMPILER: ${{ matrix.compiler }}
+      CI_STDLIB: ${{ matrix.compiler.stdlib }}
+      CI_RTLIB: ${{ matrix.compiler.rtlib }}
+      CI_LINKER: ${{ matrix.linker }}
+
     strategy:
       fail-fast: false
       matrix:
-        include:
+        compiler: [gcc, clang]
+        stdlib: [libstdc++, libc++]
+        rtlib: [libgcc, compiler-rt]
+        linker: [ld, lld]
+        exclude:
           - compiler: gcc
-          - compiler: clang
-            libcxx: libstdc++
-          - compiler: clang
-            libcxx: libc++
+            stdlib: libc++
+          - compiler: gcc
+            rtlib: compiler-rt
 
     steps:
       - name: Checkout code into source directory
         uses: actions/checkout@v4
         with:
           path: source
-
-      - name: Install dependencies
-        run: sudo -E source/scripts/ci/gha/install-dependencies.sh
 
       - name: Configure
         run: cmake -S source -B build
