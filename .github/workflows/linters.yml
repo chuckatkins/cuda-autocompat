@@ -28,23 +28,15 @@ jobs:
 
       - name: Configure
         run: |
-          linter_args=()
-          if [ "${{ matrix.linter }}" == "cppcheck" ]; then
-            linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
-            linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
-          elif [ "${{ matrix.linter }}" == "clang-tidy" ]; then
-            linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
-            linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
-          elif [ "${{ matrix.linter }}" == "iwyu" ]; then
-            linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
-            linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
-          fi
           cmake \
             -S source \
             -B build \
-            -DBUILD_TESTING=OFF \
-            -DAUTOCOMPAT_ENABLE_LINTERS=ON \
-            "${linter_args[@]}"
+            -DAUTOCOMPAT_ENABLE_OVERRIDE_LAUNCHER=ON \
+            -DAUTOCOMPAT_ENABLE_TESTING=OFF \
+            -DAUTOCOMPAT_ENABLE_LINTERS=ON
 
       - name: Build
+        env:
+          LAUNCHER_OVERRIDE_CC: /bin/true
+          LAUNCHER_OVERRIDE_CXX: /bin/true
         run: cmake --build build

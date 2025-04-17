@@ -270,7 +270,7 @@ function(add_coverage_flags)
     cmake_dependent_option(AUTOCOMPAT_ENABLE_COVERAGE
         "Enable gcov based code coverage reports"
         OFF
-        "BUILD_TESTING"
+        "AUTOCOMPAT_ENABLE_TESTING"
         OFF
     )
     if (NOT AUTOCOMPAT_ENABLE_COVERAGE)
@@ -332,4 +332,49 @@ function(add_coverage_flags)
         FIXTURES_REQUIRED COVERAGE_REPORT
         FIXTURES_CLEANUP COVERAGE
     )
+endfunction()
+
+function(_configure_lang_override_launcher LANG VAR PREFIX)
+    message(STATUS "Configuring ${LANG} launcher")
+    set(launcher ${CMAKE_BINARY_DIR}/${PREFIX}-launcher)
+    set(OVERRIDE_VARIABLE LAUNCHER_OVERRIDE_${VAR})
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/scripts/override-launcher.sh.in
+        ${launcher}
+        @ONLY
+    )
+    if (NOT CMAKE_${LANG}_COMPILER_LAUNCHER)
+        set(CMAKE_${LANG}_COMPILER_LAUNCHER ${launcher}
+            CACHE FILEPATH "${LANG} compiler launcher" FORCE
+        )
+        mark_as_advanced(CMAKE_${LANG}_COMPILER_LAUNCHER)
+        list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES
+            CMAKE_${LANG}_COMPILER_LAUNCHER
+        )
+    endif()
+    if (NOT CMAKE_${LANG}_LINKER_LAUNCHER)
+        set(CMAKE_${LANG}_LINKER_LAUNCHER ${launcher}
+            CACHE FILEPATH "${LANG} linker launcher" FORCE
+        )
+        mark_as_advanced(CMAKE_${LANG}_LINKER_LAUNCHER)
+        list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES
+            CMAKE_${LANG}_LINKER_LAUNCHER
+        )
+    endif()
+    return(PROPAGATE CMAKE_TRY_COMPILE_PLATFORM_VARIABLES)
+endfunction()
+
+function(configure_override_launcher)
+    if (NOT AUTOCOMPAT_ENABLE_OVERRIDE_LAUNCHER)
+        return()
+    endif()
+    if (NOT CMAKE_C_COMPILER_LAUNCHER OR
+        NOT CMAKE_C_LINKER_LAUNCHER)
+        _configure_lang_override_launcher(C CC cc)
+    endif()
+    if (NOT CMAKE_CXX_COMPILER_LAUNCHER OR
+        NOT CMAKE_CXX_LINKER_LAUNCHER)
+        _configure_lang_override_launcher(CXX CXX c++)
+    endif()
+    return(PROPAGATE CMAKE_TRY_COMPILE_PLATFORM_VARIABLES)
 endfunction()
