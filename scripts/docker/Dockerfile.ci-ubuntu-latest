@@ -1,0 +1,140 @@
+# Stage 1: Base builder with full dev tools
+FROM ubuntu:latest AS builder
+
+ARG LLVM_VERSION=19
+
+# Install core APT setup tools
+RUN <<EOT
+set -e
+apt-get update
+apt-get install -y --no-install-recommends \
+    curl \
+    gpg \
+    ca-certificates \
+    sudo \
+    gnupg \
+    lsb-release
+EOT
+
+# Note: While Vim and the GitHub cli app are not necessary for CI they are
+# particularly useful when using the CI image for local testing and
+# debugging.  Since their footprint is minimal then I'm including them in
+# the CI image
+
+# Add Kitware, LLVM, and githubcli APT repos
+RUN <<EOT
+set -e
+codename=$(lsb_release -cs)
+arch=$(dpkg --print-architecture)
+
+curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | \
+    gpg --dearmor -o /etc/apt/keyrings/llvm.gpg
+echo "deb [signed-by=/etc/apt/keyrings/llvm.gpg] http://apt.llvm.org/${codename}/ llvm-toolchain-${codename}-${LLVM_VERSION} main" \
+    > /etc/apt/sources.list.d/llvm.list
+
+curl -fsSL https://apt.kitware.com/keys/kitware-archive-latest.asc | \
+    gpg --dearmor -o /etc/apt/keyrings/kitware.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kitware.gpg] https://apt.kitware.com/ubuntu/ ${codename} main" \
+    > /etc/apt/sources.list.d/kitware.list
+
+curl -fsSL \
+    https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    -o /etc/apt/keyrings/githubcli.gpg
+echo "deb [arch=${arch} signed-by=/etc/apt/keyrings/githubcli.gpg] https://cli.github.com/packages stable main" \
+    > /etc/apt/sources.list.d/githubcli.list
+EOT
+
+# Install dev toolchain and core linters
+RUN <<EOT
+set -e
+apt-get update
+apt-get install -y --no-install-recommends \
+    git gh vim-tiny zstd \
+    make ninja-build cmake \
+    binutils gcc g++ \
+    clang-${LLVM_VERSION} lld-${LLVM_VERSION} llvm-${LLVM_VERSION} \
+    libc++-${LLVM_VERSION}-dev libc++abi-${LLVM_VERSION}-dev \
+    libclang-rt-${LLVM_VERSION}-dev \
+    cppcheck \
+    clang-tidy-${LLVM_VERSION} \
+    clang-tools-${LLVM_VERSION} \
+    jq \
+    valgrind
+EOT
+
+# Add user-friendly Clang symlinks
+RUN <<EOT
+set -e
+tools="clang clang++ clang-tidy scan-build ld.lld"
+cd /usr/bin
+for bin in ${tools}
+do
+    ln -sv ${bin}-${LLVM_VERSION} ${bin}
+done
+EOT
+
+# Install yq
+RUN <<EOT
+arch=$(dpkg --print-architecture)
+curl -fsSL \
+    https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${arch} \
+    -o /usr/local/bin/yq
+chmod +x /usr/local/bin/yq
+EOT
+
+# Stage 1a: Build IWYU from source against LLVM 19
+FROM builder AS iwyu-builder
+
+RUN apt-get install -y --no-install-recommends \
+        llvm-${LLVM_VERSION}-dev \
+        libclang-${LLVM_VERSION}-dev
+
+RUN git clone \
+        -b clang_${LLVM_VERSION} \
+        https://github.com/include-what-you-use/include-what-you-use.git \
+        /iwyu/source 
+
+RUN <<EOT
+cmake \
+    -S /iwyu/source \
+    -B /iwyu/build \
+    -G Ninja \
+    -DCMAKE_C_COMPILER=/usr/bin/clang-${LLVM_VERSION} \
+    -DCMAKE_CXX_COMPILER=/usr/bin/clang++-${LLVM_VERSION} \
+    -DCMAKE_PREFIX_PATH=/usr/lib/llvm-${LLVM_VERSION} \
+    -DIWYU_LLVM_ROOT_PATH=/usr/lib/llvm-${LLVM_VERSION} \
+    -DCMAKE_INSTALL_PREFIX=/iwyu/install \
+    -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
+cmake --build /iwyu/build
+cmake --build /iwyu/build -t install/strip
+EOT
+
+# Stage 2: Cleaned version of builder (no .a, docs, headers)
+FROM builder AS clean
+
+RUN <<EOT
+rm -rf \
+    /usr/share/doc \
+    /usr/share/man \
+    /usr/share/info \
+    /usr/share/lintian \
+    /usr/share/locale
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+EOT
+
+# Setup dev user
+RUN useradd -m -s /bin/bash devuser && \
+    echo "devuser ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/devuser
+
+# Stage 3: Final runtime image
+FROM ubuntu:latest
+
+COPY --from=clean / /
+COPY --from=iwyu-builder \
+    /iwyu/install/bin/include-what-you-use \
+    /usr/local/bin/include-what-you-use
+
+USER devuser
+WORKDIR /home/devuser
+ENTRYPOINT ["/bin/bash", "--login"]

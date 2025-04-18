@@ -14,10 +14,13 @@
 
 cmake_minimum_required(VERSION 3.25)
 
-# LAUNCHER configuration needs to be done before project() so it's used
-# when detecting compilers and generating the build files
+# CI and LAUNCHER configurations need to be done before project() so they're
+# picked up when detecting compilers and generating the build files
 list(PREPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(AutoCompatBuildUtils)
+
+check_ci_env()
+
 option(AUTOCOMPAT_ENABLE_OVERRIDE_LAUNCHER
     "Configure and use the compiler override launcher"
     FALSE
@@ -51,9 +54,17 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Useful / necessary for linters and external analysis tools
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Reduce compiled binary size, especially when statically linking the
-# C++ standard library
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+# Enable LTO to reduce compiled binary size, especially when statically
+# linking the C++ standard library
+# Note: LTO can only be enabled with a matching toolchain, i.e. gcc+ld or
+#       clang+lld; gcc+lld and clang+ld don't understand eachother's
+#       intermediate LTO representation
+if ((CMAKE_CXX_COMPILER_ID MATCHES Clang AND
+     CMAKE_CXX_COMPILER_LINKER_ID MATCHES LLD) OR
+    (CMAKE_CXX_COMPILER_ID MATCHES GNU AND
+     CMAKE_CXX_COMPILER_LINKER_ID MATCHES GNU))
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+endif()
 
 include(CTest)
 option(AUTOCOMPAT_ENABLE_TESTING
