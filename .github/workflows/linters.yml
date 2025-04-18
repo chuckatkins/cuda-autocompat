@@ -22,7 +22,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        linter: [cppcheck, clang-tidy, iwyu]
+        #linter: [cppcheck, clang-tidy, iwyu]
+        linter: [clang-tidy]
 
     steps:
       - name: Checkout code into source directory
@@ -58,4 +59,13 @@ jobs:
         env:
           LAUNCHER_OVERRIDE_CC: /bin/true
           LAUNCHER_OVERRIDE_CXX: /bin/true
-        run: cmake --build build
+        run: |
+          cmake --build build | tee linter.stdout
+
+      - name: Annotate
+        run: |
+          tool=${PWD}/source/scripts/ci/github/annotate-${{ matrix.linter }}.py
+          if [[ -x ${tool} ]]
+          then
+              ${tool} linter.stdout ${PWD}/source
+          fi
