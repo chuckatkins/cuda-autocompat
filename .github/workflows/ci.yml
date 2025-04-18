@@ -18,6 +18,7 @@ defaults:
 
 jobs:
   changed-files:
+    if: false
     name: Changed Files
     uses: ./.github/workflows/changed-files.yml
 
@@ -66,8 +67,8 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
   linters:
-    needs: changed-files
-    if: needs.changed-files.outputs.src || needs.changed-files.outputs.linters
+    #needs: changed-files
+    #if: needs.changed-files.outputs.src || needs.changed-files.outputs.linters
     name: Linter
     uses: ./.github/workflows/linters.yml
 
