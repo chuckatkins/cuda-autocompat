@@ -31,7 +31,6 @@ jobs:
       image: ghcr.io/chuckatkins/cuda-autocompat:ci-ubuntu-latest
 
     env:
-      CMAKE_GENERATOR: Ninja
       CI_COMPILER: ${{ matrix.compiler }}
       CI_STDLIB: ${{ matrix.compiler.stdlib }}
       CI_RTLIB: ${{ matrix.compiler.rtlib }}
@@ -51,24 +50,39 @@ jobs:
             rtlib: compiler-rt
 
     steps:
-      - name: Checkout code into source directory
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           path: source
 
+      - name: Setup CMake
+        id: cmake
+        uses: chuckatkins/github-utils/actions/setup-cmake@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          source_dir: source
+
       - name: Configure
-        run: cmake -S source -B build
+        run: |
+          ${{ steps.cmake.outputs.cmake }} \
+              -S ${{ steps.cmake.outputs.cmake_source_dir }} \
+              -B ${{ steps.cmake.outputs.cmake_binary_dir }}
 
       - name: Build
-        run: cmake --build build
+        run: |
+          ${{ steps.cmake.outputs.cmake }} \
+              --build ${{ steps.cmake.outputs.cmake_binary_dir }}
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: |
+          ${{ steps.cmake.outputs.ctest }} \
+              --test-dir ${{ steps.cmake.outputs.cmake_binary_dir }} \
+              --output-on-failure
 
   linters:
     needs: changed-files
     if: needs.changed-files.outputs.src || needs.changed-files.outputs.linters
-    name: Linter
+    name: Linters
     uses: ./.github/workflows/linters.yml
 
   static-analyzers:

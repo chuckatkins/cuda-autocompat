@@ -13,15 +13,21 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      CMAKE_GENERATOR: Ninja
       CI_COMPILER: clang
       CI_LINKER: lld
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           path: source
+
+      - name: Setup CMake
+        id: cmake
+        uses: chuckatkins/github-utils/actions/setup-cmake@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          source_dir: source
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
@@ -33,14 +39,15 @@ jobs:
 
       - name: Configure
         run: |
-          cmake \
-              -S source \
-              -B build \
+          ${{ steps.cmake.outputs.cmake }} \
+              -S ${{ steps.cmake.outputs.cmake_source_dir }} \
+              -B ${{ steps.cmake.outputs.cmake_binary_dir }} \
               -DAUTOCOMPAT_ENABLE_TESTING=OFF
 
       - name: Build
         run: |
-          cmake --build build
+          ${{ steps.cmake.outputs.cmake }} \
+              --build ${{ steps.cmake.outputs.cmake_binary_dir }}
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
@@ -57,26 +64,33 @@ jobs:
       image: ghcr.io/chuckatkins/cuda-autocompat:ci-ubuntu-latest
 
     env:
-      CMAKE_GENERATOR: Ninja
       CC: clang
       CXX: clang++
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           path: source
+
+      - name: Setup CMake
+        id: cmake
+        uses: chuckatkins/github-utils/actions/setup-cmake@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          source_dir: source
 
       - name: Configure
         env:
           LAUNCHER_OVERRIDE_CC: ${{ env.CC }}
           LAUNCHER_OVERRIDE_CXX: ${{ env.CXX }}
         run: |
-          scan-build cmake \
-            -S source \
-            -B build \
-            -DAUTOCOMPAT_ENABLE_OVERRIDE_LAUNCHER=ON \
-            -DBUILD_TESTING=OFF
+          scan-build \
+              ${{ steps.cmake.outputs.cmake }} \
+                  -S ${{ steps.cmake.outputs.cmake_source_dir }} \
+                  -B ${{ steps.cmake.outputs.cmake_binary_dir }} \
+                  -DAUTOCOMPAT_ENABLE_OVERRIDE_LAUNCHER=ON \
+                  -DBUILD_TESTING=OFF
 
       - name: Analyze
         env:
@@ -84,9 +98,9 @@ jobs:
           CCC_CXX: /bin/true
         run: |
           mkdir sarif
-          scan-build \
-            -V -sarif -o sarif \
-            cmake --build build
+          scan-build -V -sarif -o sarif \
+              ${{ steps.cmake.outputs.cmake }} \
+                  --build ${{ steps.cmake.outputs.cmake_binary_dir }}
 
       - name: Merge SARIF results
         run: |
