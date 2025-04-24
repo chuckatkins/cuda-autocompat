@@ -13,7 +13,8 @@ apt-get install -y --no-install-recommends \
     ca-certificates \
     sudo \
     gnupg \
-    lsb-release
+    lsb-release \
+    unzip
 EOT
 
 # Note: While Vim and the GitHub cli app are not necessary for CI they are

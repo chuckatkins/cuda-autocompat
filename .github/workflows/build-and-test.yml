@@ -1,0 +1,105 @@
+name: Build and Test
+
+on:
+  workflow_call:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  gcc:
+    name: GCC
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/chuckatkins/cuda-autocompat:ci-ubuntu-latest
+
+    env:
+      CI_COMPILER: gcc
+      CI_LINKER: ${{ matrix.linker }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        linker: [ld, lld]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Setup CMake
+        id: cmake
+        uses: chuckatkins/github-utils/actions/setup-cmake@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          source_dir: source
+
+      - name: Configure
+        run: |
+          ${{ steps.cmake.outputs.cmake }} \
+              -S ${{ steps.cmake.outputs.cmake_source_dir }} \
+              -B ${{ steps.cmake.outputs.cmake_binary_dir }}
+
+      - name: Build
+        run: |
+          ${{ steps.cmake.outputs.cmake }} \
+              --build ${{ steps.cmake.outputs.cmake_binary_dir }} \
+              --verbose
+
+      - name: Test
+        run: |
+          ${{ steps.cmake.outputs.ctest }} \
+              -VV \
+              --test-dir ${{ steps.cmake.outputs.cmake_binary_dir }}
+
+  clang:
+    name: Clang
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/chuckatkins/cuda-autocompat:ci-ubuntu-latest
+
+    env:
+      CI_COMPILER: clang
+      CI_STDLIB: ${{ matrix.compiler.stdlib }}
+      CI_RTLIB: ${{ matrix.compiler.rtlib }}
+      CI_LINKER: ${{ matrix.linker }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        stdlib: [libstdc++, libc++]
+        rtlib: [libgcc, compiler-rt]
+        linker: [ld, lld]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Setup CMake
+        id: cmake
+        uses: chuckatkins/github-utils/actions/setup-cmake@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          source_dir: source
+
+      - name: Configure
+        run: |
+          ${{ steps.cmake.outputs.cmake }} \
+              -S ${{ steps.cmake.outputs.cmake_source_dir }} \
+              -B ${{ steps.cmake.outputs.cmake_binary_dir }}
+
+      - name: Build
+        run: |
+          ${{ steps.cmake.outputs.cmake }} \
+              --build ${{ steps.cmake.outputs.cmake_binary_dir }} \
+              --verbose
+
+      - name: Test
+        run: |
+          ${{ steps.cmake.outputs.ctest }} \
+              -VV \
+              --test-dir ${{ steps.cmake.outputs.cmake_binary_dir }}

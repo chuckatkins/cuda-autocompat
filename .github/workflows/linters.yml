@@ -15,7 +15,6 @@ jobs:
       image: ghcr.io/chuckatkins/cuda-autocompat:ci-ubuntu-latest
 
     env:
-      CMAKE_GENERATOR: Ninja
       CC: clang
       CXX: clang++
 
@@ -25,37 +24,45 @@ jobs:
         linter: [cppcheck, clang-tidy, iwyu]
 
     steps:
-      - name: Checkout code into source directory
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           path: source
+
+      - name: Setup CMake
+        id: cmake
+        uses: chuckatkins/github-utils/actions/setup-cmake@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure
         run: |
           linter_args=()
           if [[ ${{ matrix.linter }} == cppcheck ]]
           then
-            linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
-            linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
+              linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
+              linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
           elif [[ ${{ matrix.linter }} == clang-tidy ]]
           then
-            linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
-            linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
+              linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
+              linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
           elif [[ ${{ matrix.linter }} == iwyu ]]
           then
-            linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
-            linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
+              linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
+              linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
           fi
-          cmake \
-            -S source \
-            -B build \
-            -DAUTOCOMPAT_ENABLE_OVERRIDE_LAUNCHER=ON \
-            -DAUTOCOMPAT_ENABLE_TESTING=OFF \
-            -DAUTOCOMPAT_ENABLE_LINTERS=ON \
-            "${linter_args[@]}"
+          ${{ steps.cmake.outputs.cmake }} \
+              -S ${{ steps.cmake.outputs.cmake_source_dir }} \
+              -B ${{ steps.cmake.outputs.cmake_binary_dir }} \
+              -DAUTOCOMPAT_ENABLE_OVERRIDE_LAUNCHER=ON \
+              -DAUTOCOMPAT_ENABLE_TESTING=OFF \
+              -DAUTOCOMPAT_ENABLE_LINTERS=ON \
+              "${linter_args[@]}"
 
       - name: Build
         env:
           LAUNCHER_OVERRIDE_CC: /bin/true
           LAUNCHER_OVERRIDE_CXX: /bin/true
-        run: cmake --build build
+        run: |
+          ${{ steps.cmake.outputs.cmake }} \
+              --build ${{ steps.cmake.outputs.cmake_binary_dir }}

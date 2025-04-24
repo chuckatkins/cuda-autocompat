@@ -37,11 +37,15 @@ jobs:
           fetch-depth: 0
       - name: Detect changed files
         id: changes
-        uses: ./.github/actions/changed-files
+        uses: chuckatkins/github-utils/actions/changed-files@main
         with:
           filters: |
+            ci:
+              - '.github/**'
+              - 'scripts/ci/**'
             src:
               - 'CMakeLists.txt'
+              - '*.cmake'
               - 'cmake/**'
               - 'src/**'
             test:
