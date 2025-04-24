@@ -24,60 +24,8 @@ jobs:
   build-and-test:
     needs: changed-files
     if: needs.changed-files.outputs.src_test
-
-    name: Build
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/chuckatkins/cuda-autocompat:ci-ubuntu-latest
-
-    env:
-      CI_COMPILER: ${{ matrix.compiler }}
-      CI_STDLIB: ${{ matrix.compiler.stdlib }}
-      CI_RTLIB: ${{ matrix.compiler.rtlib }}
-      CI_LINKER: ${{ matrix.linker }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        compiler: [gcc, clang]
-        stdlib: [libstdc++, libc++]
-        rtlib: [libgcc, compiler-rt]
-        linker: [ld, lld]
-        exclude:
-          - compiler: gcc
-            stdlib: libc++
-          - compiler: gcc
-            rtlib: compiler-rt
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          path: source
-
-      - name: Setup CMake
-        id: cmake
-        uses: chuckatkins/github-utils/actions/setup-cmake@main
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          source_dir: source
-
-      - name: Configure
-        run: |
-          ${{ steps.cmake.outputs.cmake }} \
-              -S ${{ steps.cmake.outputs.cmake_source_dir }} \
-              -B ${{ steps.cmake.outputs.cmake_binary_dir }}
-
-      - name: Build
-        run: |
-          ${{ steps.cmake.outputs.cmake }} \
-              --build ${{ steps.cmake.outputs.cmake_binary_dir }}
-
-      - name: Test
-        run: |
-          ${{ steps.cmake.outputs.ctest }} \
-              --test-dir ${{ steps.cmake.outputs.cmake_binary_dir }} \
-              --output-on-failure
+    name: Build and Test
+    uses: ./.github/workflows/build-and-test.yml
 
   linters:
     needs: changed-files
