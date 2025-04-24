@@ -71,6 +71,11 @@ option(AUTOCOMPAT_ENABLE_TESTING
     "Build the testing tree"
     ${BUILD_TESTING}
 )
+configure_file(
+  ${PROJECT_SOURCE_DIR}/CTestCustom.cmake.in
+  ${PROJECT_BINARY_DIR}/CTestCustom.cmake
+  @ONLY
+)
 
 add_extra_flags()
 add_static_cxx_flags()

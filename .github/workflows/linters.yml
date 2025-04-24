@@ -17,6 +17,8 @@ jobs:
     env:
       CC: clang
       CXX: clang++
+      CI_COMPILER: clang
+      CI_LINTER: ${{ matrix.linter }}
 
     strategy:
       fail-fast: false
@@ -40,29 +42,28 @@ jobs:
           linter_args=()
           if [[ ${{ matrix.linter }} == cppcheck ]]
           then
-              linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
-              linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
+              linter_args+=( CLANG_TIDY_EXECUTABLE:FILEPATH=IGNORE )
+              linter_args+=( INCLUDE_WHAT_YOU_USE_EXECUTABLE:FILEPATH=IGNORE )
           elif [[ ${{ matrix.linter }} == clang-tidy ]]
           then
-              linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
-              linter_args+=( -DINCLUDE_WHAT_YOU_USE_EXECUTABLE=IGNORE )
+              linter_args+=( CPPCHECK_EXECUTABLE:FILEPATH=IGNORE )
+              linter_args+=( INCLUDE_WHAT_YOU_USE_EXECUTABLE:FILEPATH=IGNORE )
           elif [[ ${{ matrix.linter }} == iwyu ]]
           then
-              linter_args+=( -DCPPCHECK_EXECUTABLE=IGNORE )
-              linter_args+=( -DCLANG_TIDY_EXECUTABLE=IGNORE )
+              linter_args+=( CPPCHECK_EXECUTABLE:FILEPATH=IGNORE )
+              linter_args+=( CLANG_TIDY_EXECUTABLE:FILEPATH=IGNORE )
           fi
-          ${{ steps.cmake.outputs.cmake }} \
-              -S ${{ steps.cmake.outputs.cmake_source_dir }} \
-              -B ${{ steps.cmake.outputs.cmake_binary_dir }} \
-              -DAUTOCOMPAT_ENABLE_OVERRIDE_LAUNCHER=ON \
-              -DAUTOCOMPAT_ENABLE_TESTING=OFF \
-              -DAUTOCOMPAT_ENABLE_LINTERS=ON \
+          source/scripts/ci/github/run.sh update configure \
+              AUTOCOMPAT_ENABLE_OVERRIDE_LAUNCHER:BOOL=ON \
+              AUTOCOMPAT_ENABLE_TESTING:BOOL=OFF \
+              AUTOCOMPAT_ENABLE_LINTERS:BOOL=ON \
               "${linter_args[@]}"
 
       - name: Build
         env:
           LAUNCHER_OVERRIDE_CC: /bin/true
           LAUNCHER_OVERRIDE_CXX: /bin/true
-        run: |
-          ${{ steps.cmake.outputs.cmake }} \
-              --build ${{ steps.cmake.outputs.cmake_binary_dir }}
+        run: source/scripts/ci/github/run.sh build
+
+      - name: Done
+        run: source/scripts/ci/github/run.sh done
