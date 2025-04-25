@@ -173,6 +173,7 @@ echo "::group::CTest version"
 "${CTEST}" --version
 echo "::endgroup::"
 
+export VERBOSE=1
 echo "::group::Execute job step"
 "${CTEST}" -VV -S "${CTEST_SCRIPT}" "${CTEST_ARGS[@]}"
 RET=$?
