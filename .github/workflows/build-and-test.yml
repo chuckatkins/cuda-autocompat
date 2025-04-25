@@ -36,23 +36,21 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           source_dir: source
 
+      - name: Update
+        run: source/scripts/ci/github/run.sh update
+
       - name: Configure
-        run: |
-          ${{ steps.cmake.outputs.cmake }} \
-              -S ${{ steps.cmake.outputs.cmake_source_dir }} \
-              -B ${{ steps.cmake.outputs.cmake_binary_dir }}
+        run: source/scripts/ci/github/run.sh configure
 
       - name: Build
-        run: |
-          ${{ steps.cmake.outputs.cmake }} \
-              --build ${{ steps.cmake.outputs.cmake_binary_dir }} \
-              --verbose
+        run: source/scripts/ci/github/run.sh build
 
       - name: Test
-        run: |
-          ${{ steps.cmake.outputs.ctest }} \
-              -VV \
-              --test-dir ${{ steps.cmake.outputs.cmake_binary_dir }}
+        run: source/scripts/ci/github/run.sh test
+
+      - name: Done
+        if: always()
+        run: source/scripts/ci/github/run.sh done
 
   clang:
     name: Clang
@@ -62,8 +60,8 @@ jobs:
 
     env:
       CI_COMPILER: clang
-      CI_STDLIB: ${{ matrix.compiler.stdlib }}
-      CI_RTLIB: ${{ matrix.compiler.rtlib }}
+      CI_STDLIB: ${{ matrix.stdlib }}
+      CI_RTLIB: ${{ matrix.rtlib }}
       CI_LINKER: ${{ matrix.linker }}
 
     strategy:
@@ -87,19 +85,14 @@ jobs:
           source_dir: source
 
       - name: Configure
-        run: |
-          ${{ steps.cmake.outputs.cmake }} \
-              -S ${{ steps.cmake.outputs.cmake_source_dir }} \
-              -B ${{ steps.cmake.outputs.cmake_binary_dir }}
+        run: source/scripts/ci/github/run.sh update configure
 
       - name: Build
-        run: |
-          ${{ steps.cmake.outputs.cmake }} \
-              --build ${{ steps.cmake.outputs.cmake_binary_dir }} \
-              --verbose
+        run: source/scripts/ci/github/run.sh build
 
       - name: Test
-        run: |
-          ${{ steps.cmake.outputs.ctest }} \
-              -VV \
-              --test-dir ${{ steps.cmake.outputs.cmake_binary_dir }}
+        run: source/scripts/ci/github/run.sh test
+
+      - name: Done
+        if: always()
+        run: source/scripts/ci/github/run.sh done
