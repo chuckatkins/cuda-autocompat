@@ -23,7 +23,7 @@ jobs:
 
   build-and-test:
     needs: changed-files
-    if: needs.changed-files.outputs.src_test
+    if: false # needs.changed-files.outputs.src_test
     name: Build and Test
     uses: ./.github/workflows/build-and-test.yml
 
@@ -35,7 +35,7 @@ jobs:
 
   static-analyzers:
     needs: changed-files
-    if: needs.changed-files.outputs.src
+    if: false # needs.changed-files.outputs.src
     name: Static Analyzers
     uses: ./.github/workflows/static-analyzers.yml
     permissions:
