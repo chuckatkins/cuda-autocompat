@@ -336,6 +336,20 @@ function(add_linter_options)
     _add_linter_option(INCLUDE_WHAT_YOU_USE)
     _add_linter_option(CLANG_TIDY)
 
+    if (CLANG_TIDY IN_LIST AUTOCOMPAT_LINTERS_FOUND)
+        set(CMAKE_C_CLANG_TIDY_EXPORT_FIXES_DIR
+            ${PROJECT_BINARY_DIR}/clang-tidy-fixes
+            CACHE PATH ""
+        )
+        mark_as_advanced(CMAKE_C_CLANG_TIDY_EXPORT_FIXES_DIR)
+
+        set(CMAKE_CXX_CLANG_TIDY_EXPORT_FIXES_DIR
+            ${PROJECT_BINARY_DIR}/clang-tidy-fixes
+            CACHE PATH ""
+        )
+        mark_as_advanced(CMAKE_CXX_CLANG_TIDY_EXPORT_FIXES_DIR)
+    endif()
+
     if (AUTOCOMPAT_ENABLE_LINTERS)
         if (NOT AUTOCOMPAT_LINTERS_FOUND)
             message(FATAL_ERROR "Linting is enabled but no linters were found")
