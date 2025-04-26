@@ -15,7 +15,7 @@
 set(CTEST_CUSTOM_MAXIMUM_NUMBER_OF_ERRORS 1000)
 set(CTEST_CUSTOM_MAXIMUM_NUMBER_OF_WARNINGS 1000)
 
-list(APPEND CTEST_CUSTOM_WARNING_EXCEPTION
-    # clang-tidy fit-it, always associated with an already caught warning
-    " note: "
-)
+#list(APPEND CTEST_CUSTOM_WARNING_EXCEPTION
+#    # clang-tidy fit-it, always associated with an already caught warning
+#    " note: "
+#)

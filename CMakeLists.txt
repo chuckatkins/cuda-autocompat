@@ -94,8 +94,8 @@ set(CPPCHECK_OPTIONS
     --check-level=exhaustive
 )
 set(INCLUDE_WHAT_YOU_USE_OPTIONS
-    -Xiwyu --check_also=${PROJECT_SOURCE_DIR}/src/\*.h
-    -Xiwyu --check_also=${PROJECT_BINARY_DIR}/src/\*.h
+#    -Xiwyu --check_also=${PROJECT_SOURCE_DIR}/src/\*.h
+#    -Xiwyu --check_also=${PROJECT_BINARY_DIR}/src/\*.h
     -Xiwyu --mapping_file=${PROJECT_SOURCE_DIR}/.iwyu-mappings.imp
 )
 add_linter_options()

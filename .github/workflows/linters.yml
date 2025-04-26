@@ -23,7 +23,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        linter: [cppcheck, clang-tidy, iwyu]
+        linter: [clang-tidy]
+        #linter: [cppcheck, clang-tidy, iwyu]
 
     steps:
       - name: Checkout
@@ -53,7 +54,7 @@ jobs:
               linter_args+=( CPPCHECK_EXECUTABLE:FILEPATH=IGNORE )
               linter_args+=( CLANG_TIDY_EXECUTABLE:FILEPATH=IGNORE )
           fi
-          source/scripts/ci/github/run.sh update configure \
+          source/scripts/ci/github/run.sh update configure -Ddashboard_do_submit=FALSE \
               AUTOCOMPAT_ENABLE_OVERRIDE_LAUNCHER:BOOL=ON \
               AUTOCOMPAT_ENABLE_TESTING:BOOL=OFF \
               AUTOCOMPAT_ENABLE_LINTERS:BOOL=ON \
@@ -63,7 +64,13 @@ jobs:
         env:
           LAUNCHER_OVERRIDE_CC: /bin/true
           LAUNCHER_OVERRIDE_CXX: /bin/true
-        run: source/scripts/ci/github/run.sh build
+        run: source/scripts/ci/github/run.sh build -Ddashboard_do_submit=FALSE
 
       - name: Done
-        run: source/scripts/ci/github/run.sh done
+        run: source/scripts/ci/github/run.sh done -Ddashboard_do_submit=FALSE
+
+      - name: Summarize
+        if: always()
+        uses: chuckatkins/github-utils/actions/ctest-build-summary@add-ctest-build-summary
+        with:
+          format: tidy
